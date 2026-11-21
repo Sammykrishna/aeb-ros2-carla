@@ -1,0 +1,16 @@
+# build output and environment
+build/
+install/
+log/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# recorded runs and simulator logs, about 3 GB per full run
+bags*/
+carla_*.log
+
+# model weights download automatically on first use
+*.pt
