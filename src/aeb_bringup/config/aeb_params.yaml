@@ -1,0 +1,23 @@
+aeb_controller:
+  ros__parameters:
+    max_decel_mps2: 4.5
+    warn_ratio: 0.3
+    partial_ratio: 0.65
+    full_ratio: 0.9
+    latency_s: 0.2
+    margin_m: 3.0
+    brake_decay_per_s: 0.6
+    confirm_s: 0.1
+    min_target_decel_mps2: 2.0
+    hold_time_s: 2.0
+    rate_hz: 50.0
+yolo_detector:
+  ros__parameters:
+    model: yolo11s.pt
+    conf: 0.4
+    device: cuda:0
+    imgsz: 960
+aeb_fusion:
+  ros__parameters:
+    cam_in_lidar_xyz: [1.5, 0.0, -0.2]
+    bumper_offset_m: 2.4
