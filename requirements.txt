@@ -1,0 +1,4 @@
+# installed into .venv (created with --system-site-packages so rclpy is visible)
+ultralytics
+# carla: pip install ~/CARLA_0.9.16/PythonAPI/carla/dist/carla-0.9.16-cp312-*.whl
+setuptools<80   # newer setuptools breaks colcon --symlink-install rebuilds

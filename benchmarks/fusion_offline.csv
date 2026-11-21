@@ -1,0 +1,43 @@
+variant,gap_bin_m,frames,fused_rate,wrong_rate,err_mean_m,err_mae_m
+"A current (shrink .5, min 3, median)",5-15,256,1.0,0.0,0.12,0.12
+"A current (shrink .5, min 3, median)",15-25,147,0.91,0.0,0.15,0.15
+"A current (shrink .5, min 3, median)",25-35,149,0.36,0.0,0.13,0.13
+"A current (shrink .5, min 3, median)",35-45,180,0.08,0.0,0.18,0.18
+"A current (shrink .5, min 3, median)",45-60,172,0.15,0.0,0.16,0.16
+"A current (shrink .5, min 3, median)",5-60,904,0.54,0.0,0.14,0.14
+"B shrink .8, min 3, median",5-15,256,1.0,0.0,0.17,0.17
+"B shrink .8, min 3, median",15-25,147,1.0,0.0,0.19,0.19
+"B shrink .8, min 3, median",25-35,149,0.97,0.02,0.32,0.32
+"B shrink .8, min 3, median",35-45,180,0.85,0.14,0.99,0.99
+"B shrink .8, min 3, median",45-60,172,0.23,0.0,0.18,0.18
+"B shrink .8, min 3, median",5-60,904,0.82,0.03,0.37,0.37
+"C shrink .8, min 2, median",5-15,256,1.0,0.0,0.17,0.17
+"C shrink .8, min 2, median",15-25,147,1.0,0.0,0.19,0.19
+"C shrink .8, min 2, median",25-35,149,1.0,0.02,0.31,0.31
+"C shrink .8, min 2, median",35-45,180,0.96,0.15,0.92,0.92
+"C shrink .8, min 2, median",45-60,172,0.61,0.0,0.17,0.17
+"C shrink .8, min 2, median",5-60,904,0.92,0.03,0.35,0.35
+"D full box, min 2, nearest cluster",5-15,256,1.0,0.0,0.2,0.2
+"D full box, min 2, nearest cluster",15-25,147,1.0,0.0,0.22,0.22
+"D full box, min 2, nearest cluster",25-35,149,1.0,0.0,0.3,0.3
+"D full box, min 2, nearest cluster",35-45,180,0.98,0.0,0.32,0.32
+"D full box, min 2, nearest cluster",45-60,172,0.84,0.0,0.2,0.2
+"D full box, min 2, nearest cluster",5-60,904,0.97,0.0,0.24,0.24
+"E shrink .8, min 2, nearest cluster",5-15,256,1.0,0.0,0.15,0.15
+"E shrink .8, min 2, nearest cluster",15-25,147,1.0,0.0,0.19,0.19
+"E shrink .8, min 2, nearest cluster",25-35,149,1.0,0.0,0.23,0.23
+"E shrink .8, min 2, nearest cluster",35-45,180,0.96,0.0,0.29,0.29
+"E shrink .8, min 2, nearest cluster",45-60,172,0.61,0.0,0.17,0.17
+"E shrink .8, min 2, nearest cluster",5-60,904,0.92,0.0,0.2,0.2
+"F full box, min 2, nearest, z>-1.5",5-15,256,1.0,0.0,0.17,0.17
+"F full box, min 2, nearest, z>-1.5",15-25,147,1.0,0.0,0.21,0.21
+"F full box, min 2, nearest, z>-1.5",25-35,149,1.0,0.0,0.25,0.25
+"F full box, min 2, nearest, z>-1.5",35-45,180,0.98,0.0,0.32,0.32
+"F full box, min 2, nearest, z>-1.5",45-60,172,0.84,0.0,0.2,0.2
+"F full box, min 2, nearest, z>-1.5",5-60,904,0.97,0.0,0.23,0.23
+"G full box, min 1, nearest, z>-1.5",5-15,256,1.0,0.0,0.17,0.17
+"G full box, min 1, nearest, z>-1.5",15-25,147,1.0,0.0,0.21,0.21
+"G full box, min 1, nearest, z>-1.5",25-35,149,1.0,0.0,0.25,0.25
+"G full box, min 1, nearest, z>-1.5",35-45,180,0.99,0.0,0.32,0.32
+"G full box, min 1, nearest, z>-1.5",45-60,172,0.99,0.02,0.74,0.74
+"G full box, min 1, nearest, z>-1.5",5-60,904,1.0,0.0,0.33,0.33
