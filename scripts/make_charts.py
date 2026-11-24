@@ -1,5 +1,6 @@
 import csv
 import glob
+import json
 import sys
 
 import matplotlib
@@ -33,11 +34,11 @@ def fusion_by_distance():
     rows = [r for r in csv.DictReader(open("benchmarks/fusion_offline.csv")) if r["gap_bin_m"] != "5-60"]
     bins = sorted({r["gap_bin_m"] for r in rows}, key=lambda b: int(b.split("-")[0]))
     rate = lambda prefix: [float(next(r["fused_rate"] for r in rows if r["variant"].startswith(prefix) and r["gap_bin_m"] == b)) * 100 for b in bins]
-    before, after = rate("A "), rate("D ")
+    before, after = rate("A "), rate("H ")
     x, w = np.arange(len(bins)), 0.38
     fig, ax = plt.subplots(figsize=(8.5, 4.4))
     ax.bar(x - w / 2 - 0.01, before, w, color=ORANGE, label="Before: shrunk box, median of at least 3 points")
-    ax.bar(x + w / 2 + 0.01, after, w, color=BLUE, label="After: full box, nearest cluster of at least 2 points")
+    ax.bar(x + w / 2 + 0.01, after, w, color=BLUE, label="After: full box, nearest return of at least 2 points")
     for i in (3, 4):
         ax.text(x[i] - w / 2, before[i] + 2, f"{before[i]:.0f}%", ha="center", color=INK, fontsize=10)
         ax.text(x[i] + w / 2, after[i] + 2, f"{after[i]:.0f}%", ha="center", color=INK, fontsize=10)
@@ -159,7 +160,38 @@ def stop_gaps():
     fig.savefig(f"{OUT}/stop_gaps.png", dpi=160)
 
 
+def regression_gaps():
+    runs = json.load(open("docs/regression_summary.json"))["runs"]
+    names = ["CCRs_20", "CCRs_30", "CCRs_40", "CCRs_50", "CCRm_50_20", "CCRb_50_d2", "CCRb_50_d6"]
+    labels = ["Stationary\n20 km/h", "Stationary\n30 km/h", "Stationary\n40 km/h", "Stationary\n50 km/h", "Slow lead\n50 vs 20", "Braking lead\n2 m/s2", "Braking lead\n6 m/s2"]
+    rng = np.random.default_rng(0)
+    fig, ax = plt.subplots(figsize=(9.5, 5.2))
+    for x, name in enumerate(names):
+        mine = [r for r in runs if r["scenario"] == name]
+        passed = [r["min_gap_m"] for r in mine if r["result"] == "PASS"]
+        hit = [r for r in mine if r["result"] == "COLLISION"]
+        ax.scatter(x + rng.uniform(-0.13, 0.13, len(passed)), passed, s=46, color=BLUE, zorder=3, edgecolor=SURFACE, linewidth=1)
+        if passed:
+            ax.hlines(np.mean(passed), x - 0.28, x + 0.28, color=INK_2, linewidth=1.6, zorder=2)
+        ax.scatter(x + rng.uniform(-0.13, 0.13, len(hit)), [0.0] * len(hit), s=58, color=ORANGE, marker="D", zorder=3, edgecolor=SURFACE, linewidth=1)
+        if hit:
+            worst = max(r["impact_kmh"] for r in hit)
+            ax.text(x, -2.6, f"{len(hit)} of {len(mine)} hit\nup to {worst:.0f} km/h", ha="center", va="top", fontsize=9, color=INK)
+    ax.scatter([], [], s=46, color=BLUE, label="Stopped (each dot is one run)")
+    ax.scatter([], [], s=58, color=ORANGE, marker="D", label="Collision")
+    ax.plot([], [], color=INK_2, linewidth=1.6, label="Mean of the stopped runs")
+    ax.set_xticks(range(len(names)), labels)
+    ax.set_ylim(-6.2, 15)
+    ax.set_yticks(range(0, 16, 3))
+    ax.set_ylabel("Distance left to the target (m)")
+    ax.grid(axis="x", visible=False)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), frameon=False, fontsize=9.5, ncol=3)
+    ax.set_title("Ten varied runs per scenario: stopping distance and the runs that failed", loc="left", fontsize=12.5, color=INK)
+    fig.tight_layout()
+    fig.savefig(f"{OUT}/regression_gaps.png", dpi=160)
+
+
 if __name__ == "__main__":
-    for make in (fusion_by_distance, detector_tradeoff, timelines, stop_gaps):
+    for make in (fusion_by_distance, detector_tradeoff, timelines, stop_gaps, regression_gaps):
         make()
         print("wrote", make.__name__)

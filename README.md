@@ -45,7 +45,7 @@ Below 30 percent of that limit it stays idle. Above it, it warns. From 65 percen
 
 ## What the results say
 
-I ran ten scenarios: seven collision scenarios in the style of Euro NCAP car-to-car rear tests, and three false-positive checks where the AEB must stay quiet. Each was run once on the final version, so these are single runs and not a pass rate yet.
+I ran ten scenarios: seven collision scenarios in the style of Euro NCAP car-to-car rear tests, and three false-positive checks where the AEB must stay quiet. The table shows one run of each scenario at its fixed settings. The repeated runs further down are the better evidence, and they changed what I believed about two of these rows.
 
 | Scenario | What happens | Result | First brake | Stops short by |
 |---|---|---|---|---|
@@ -74,11 +74,11 @@ YOLO11s at 960 px sees the car from about 72 m and costs 7.7 ms per frame, only 
 
 Even with the better detector, the AEB only started tracking the car at around 25 m. YOLO was detecting it in 100 percent of frames at every distance, but the fusion node was dropping most of those detections.
 
-The reason is that at 40 m the car is only about 20 pixels wide, and fusion only used the middle half of the box and demanded at least three LiDAR points inside it. A 32 channel LiDAR often has fewer than that on a distant car. I replayed the recorded LiDAR and boxes through seven variants offline before touching the live system. Just loosening the thresholds made it worse, because stray road and background points pulled the median out by about a metre. Taking the full box and the median of the nearest cluster of points fixed both problems.
+The reason is that at 40 m the car is only about 20 pixels wide, and fusion only used the middle half of the box and demanded at least three LiDAR points inside it. A 32 channel LiDAR often has fewer than that on a distant car. I replayed the recorded LiDAR and boxes through seven variants offline before touching the live system. Just loosening the thresholds made it worse, because stray road and background points pulled the median out by about a metre. Taking the full box and using the nearest LiDAR return as the range fixed both problems.
 
 ![Share of frames where fusion produced a range, before and after](docs/media/fusion_by_distance.png)
 
-After the change fusion produces a range in 98 percent of frames at 35 to 45 m, up from 8 percent. The range error stays around 0.2 to 0.3 m.
+After the change fusion produces a range in 98 percent of frames at 35 to 45 m, up from 8 percent. Overall the range is there in 96 percent of frames and the average error is 0.04 m. My first version used the median of the nearest cluster for the range, which left an error of about 0.2 m. The median sits behind the bumper because it averages over the whole rear face of the car, and that bias mattered later, when a lead car braking gently was brought into focus by the repeated runs.
 
 ### The controller had its own problems
 
@@ -94,13 +94,40 @@ Here are the two runs from the clips above as time series. On the left the brake
 
 ![Speed, gap and brake command over time for two scenarios](docs/media/timelines.png)
 
+### Thirty varied runs per scenario
+
+A single run proves very little, so I added a regression test that runs every scenario thirty times. Each run gets a seed that nudges the setup. The ego and lead speeds move by about 1 km/h, the starting gap by 5 percent, the target's sideways offset by 20 cm, the moment a lead car starts braking by 0.2 s, and the target is one of six car models. The seed makes the setup reproducible, but not the whole run, because the pipeline has its own timing noise.
+
+![Stopping distance for thirty varied runs of each scenario](docs/media/regression_gaps.png)
+
+| Scenario | Runs | Pass | Pass rate | 95% interval | Min gap, mean (range) | First brake, mean | Worst impact |
+|---|---|---|---|---|---|---|---|
+| CCRb_50_d2 | 30 | 30 | 100% | 89% to 100% | 9.2 m (3.3 to 12.2) | 23.0 m | none |
+| CCRb_50_d6 | 30 | 0 | 0% | 0% to 11% | -0.0 m (-0.1 to 0.0) | 9.7 m | 33 km/h |
+| CCRm_50_20 | 30 | 30 | 100% | 89% to 100% | 5.3 m (3.4 to 6.6) | 14.0 m | none |
+| CCRs_20 | 30 | 30 | 100% | 89% to 100% | 6.8 m (4.4 to 7.5) | 7.9 m | none |
+| CCRs_30 | 30 | 30 | 100% | 89% to 100% | 9.4 m (7.8 to 10.1) | 14.2 m | none |
+| CCRs_40 | 30 | 30 | 100% | 89% to 100% | 7.6 m (4.2 to 11.4) | 22.5 m | none |
+| CCRs_50 | 30 | 30 | 100% | 89% to 100% | 9.9 m (8.4 to 13.2) | 33.4 m | none |
+| FP_adjacent | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
+| FP_follow | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
+| FP_none | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
+
+All 300 runs finished and every scenario met its expectation. Nine scenarios passed all thirty runs, including every false-positive check: 90 runs with no brake command on the empty road, in the next lane or while following closely. Thirty clean runs only show that the pass rate is at least about 89 percent, so a clean streak is good evidence and not a guarantee.
+
+The hard braking lead is the exception, and the table shows 0 percent because the ego car hits the lead every time. Its goal was mitigation, an impact at or below 35 km/h, and it met that in all thirty runs. Impacts ranged from 23 to 34 km/h with a median of 29. The first brake comes at about 10 m with the ego car still at 50 km/h, because the tracker needs a moment of range data before it can tell the lead is slowing hard. It lowers the impact speed and does not avoid the crash.
+
+The braking lead at 2 m/s2 used to be a coin flip, and it no longer is. In the earlier ten run batch it passed 9 of 10 and stopped anywhere from 0.9 m to 12 m short. Two small things stacked up. A lead braking at 2.0 m/s2 sat exactly on my 2.0 m/s2 threshold for believing the lead was braking, and the fused range came in bursts that made the braking estimate jump. Moving the range to the nearest LiDAR return and the threshold down to 1.5 m/s2 fixed it. All thirty runs now stop clear with a gap of 8 to 12 m, and the first brake comes at 21 to 24 m in all but one. The outlier was seed 21, where the first brake came late at 16 m and the car still stopped 3.3 m short of the lead. That is the closest call in the whole batch, and it is where I would look first if the pass rate ever slips.
+
+Two next-lane runs crashed the harness before they began, because a Nissan Micra settled 0.3 to 0.4 m away from where I placed it and my start geometry check rejected it. That says nothing about the AEB. The placement now corrects itself by the measured error, and both seeds then ran and passed. CARLA also segfaulted once partway through the batch, and the runner resumed cleanly after a restart.
+
 ## What is still not good
 
 The hard braking lead car still collides, at half the original speed. That one is limited by how quickly the tracker can see a lead car start to brake, so improving it needs earlier cues than range alone, such as brake lights or radar velocity.
 
 The stationary target runs stop 7 to 12 m short. That is a deliberate trade. A car that brakes at 4.5 m/s2 needs about 21 m to stop from 50 km/h before any margin, and my offline simulation showed that braking any later collided under plausible model errors such as weaker brakes or extra delay. Real cars brake much harder, so a real system could wait longer.
 
-Other limits worth knowing. Every result is a single run, so there is no pass rate or confidence interval yet. It is all simulation, with one car model, one map and no weather. False positives were only tested in three situations, and I have not tried pedestrians, curves, cut-ins, shadows or oncoming traffic. My offline simulation agrees with CARLA on when braking starts but is optimistic about stopping distance, so I only used it to screen options.
+Other limits worth knowing. Thirty runs per scenario still leaves an interval of about 11 percentage points. It is all simulation, with one car model, one map and no weather. False positives were only tested in three situations, and I have not tried pedestrians, curves, cut-ins, shadows or oncoming traffic. My offline simulation agrees with CARLA on when braking starts but is optimistic about stopping distance, so I only used it to screen options.
 
 ## Things I got wrong along the way
 
@@ -111,6 +138,14 @@ One scenario reported a pass while the ground-truth gap was negative. The target
 Another early collision turned out to be a start-up race. YOLO takes about three seconds to produce its first result, and the scenario had already started. The detector now warms up before it subscribes, and the scenario waits until every node is ready.
 
 I also believed for a while that the partial brake stage was over-braking, based on a deceleration fit that included the spikes at impact. Fitting again with medians showed the brake map is linear and the old mapping was about right. And I once narrowed the gap between the partial and full thresholds because my simulation said it was safe, which made the real controller jump to full braking within a fraction of a second on every stationary run.
+
+The first batch of repeated runs found three problems that the single runs had hidden, and I fixed them before the final batch.
+
+A Toyota Prius parked 83 m away made the fused range jump from 75 m to 68 m at long range, where the LiDAR is sparse. The tracker read that as a closing speed of 30 m/s, and the AEB braked at full strength 67 m from a stationary car. A target cannot close faster than the ego car is driving, so the controller now caps the closing speed at the ego speed plus one metre per second.
+
+Two failures in the next-lane scenario were not the AEB at all. The ego car has no steering, and I was re-aiming its velocity along its current heading every tick, so a small yaw grew into a drift of nearly two metres. In one run it clipped the parked car at 49 km/h without braking. The ego now holds a fixed line, and any run where it drifts more than half a metre is marked invalid so it cannot be graded by accident. Across the final 300 runs the largest drift was 1 cm.
+
+I also assumed that a failing seed would fail the same way again. Those three did, because geometry caused them, but the braking lead showed that the same seed can pass on one run and collide on another.
 
 ## Running it
 
@@ -148,15 +183,24 @@ python scripts/make_pov_gif.py
 
 One chart compares the final run against an older one, so `make_charts.py` expects that older run in a local `bags_v7/` folder. Bags are not committed because they are about 3 GB per run.
 
+The regression test needs a running CARLA server.
+
+```bash
+python -m aeb_bringup.regression --runs 30                 # about 100 minutes, writes docs/regression_report.md
+AEB_REGRESSION=1 AEB_REGRESSION_RUNS=3 python -m pytest src/aeb_bringup/test/test_regression_sim.py
+```
+
+The runner exits with an error if any scenario misses its expectation in `config/regression.yaml`, which makes it usable as a CI gate. It saves each run as a small JSON file, resumes after a crash, retries an infrastructure error once, and cleans up any nodes left over from a launch that timed out. The pytest wrapper skips itself unless `AEB_REGRESSION=1` is set and CARLA is reachable.
+
 The tests need no simulator.
 
 ```bash
 python -m pytest src/aeb_controller/test/test_state_machine.py src/aeb_controller/test/test_tracking.py \
   src/aeb_fusion/test/test_geometry.py src/aeb_bringup/test/test_aeb_lifecycle.py \
-  src/aeb_bringup/test/test_scenario_math.py
+  src/aeb_bringup/test/test_scenario_math.py src/aeb_bringup/test/test_regression_stats.py
 ```
 
-That is 47 tests. They cover the controller logic, the tracker, the fusion geometry and the controller's lifecycle transitions through `launch_testing`. The auto-generated flake8 and pep257 stubs that `ros2 pkg create` adds enforce ROS style and are not part of this list.
+That is 63 tests. They cover the controller logic, the tracker, the fusion geometry, the regression statistics and the controller's lifecycle transitions through `launch_testing`. The auto-generated flake8 and pep257 stubs that `ros2 pkg create` adds enforce ROS style and are not part of this list.
 
 ## What is in the repository
 
@@ -164,16 +208,16 @@ That is 47 tests. They cover the controller logic, the tracker, the fusion geome
 src/aeb_detector/     YOLO node
 src/aeb_fusion/       fusion node and geometry.py (nearest cluster depth)
 src/aeb_controller/   lifecycle node, tracking.py, state_machine.py
-src/aeb_bringup/      launch file, scenarios.yaml, params, CARLA bridge, tests
+src/aeb_bringup/      launch file, scenarios.yaml, params, CARLA bridge, regression runner and statistics, tests
 scripts/              run_scenarios.sh, analyze_bags.py, controller_sim.py, make_charts.py, make_pov_gif.py
 benchmarks/           detector benchmark, offline fusion test, and their CSV results
-docs/media/           charts and clips used in this README
+docs/                 regression report and data, plus media/ with the charts and clips used here
 ```
 
 `controller_sim.py` is the offline controller simulation I used to screen thresholds. It uses the measured brake map and the measured estimate noise. Run it with `validate` to compare it against the last recorded CARLA results.
 
 ## What comes next
 
-The next job is a repeated-run regression test: run each scenario many times, report the pass rate with a confidence interval, and wire the pass or fail check into `launch_testing` so it can run in CI. After that I want a faster reaction to a hard braking lead car, and a sweep over QoS settings and DDS implementations to see whether the middleware configuration changes the safety outcome. That last one is the part I think is most worth writing up properly.
+The regression test exists and now runs thirty seeds per scenario, so the next jobs are the ones it pointed at. First is a faster reaction to a hard braking lead car, since that is the one scenario that still collides. After that I want to widen what is tested, with pedestrians, curves, cut-ins and weather, and a sweep over QoS settings and DDS implementations to see whether the middleware configuration changes the safety outcome. That last one is the part I think is most worth writing up properly.
 
 Licensed under Apache 2.0.

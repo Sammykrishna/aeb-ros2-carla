@@ -30,14 +30,20 @@ def fuse(pts_lidar: np.ndarray, shrink: float = 1.0, min_points: int = 2) -> np.
     return nearest_cluster_xyz(pts_lidar, u_px, v_px, in_front, BOX_PX, shrink, min_points)
 
 
-def test_range_is_median_of_points_within_depth_window_of_the_nearest_and_ignores_points_outside_box():
+def test_range_is_the_nearest_return_and_ignores_points_outside_the_box():
     pts_lidar = np.array([[20.0, 0.0, 0.0], [22.0, 0.0, 0.0], [21.0, 0.0, 0.0], [60.0, 8.0, 0.0]])
-    assert np.isclose(fuse(pts_lidar)[0], 20.5)
+    assert np.isclose(fuse(pts_lidar)[0], 20.0)
+
+
+def test_sideways_position_is_the_median_of_the_points_near_the_rear_surface():
+    pts_lidar = np.array([[20.0, 0.1, 0.0], [20.2, 0.3, 0.0], [20.3, -0.1, 0.0], [25.0, 0.2, 0.0]])
+    xyz_m = fuse(pts_lidar, shrink=1.0)
+    assert np.isclose(xyz_m[0], 20.0) and np.isclose(xyz_m[1], 0.1)
 
 
 def test_background_behind_the_target_does_not_skew_the_range():
     pts_lidar = np.array([[20.0, 0.0, 0.0], [20.3, 0.1, 0.0], [45.0, 0.0, 0.0], [46.0, 0.0, 0.0], [47.0, 0.0, 0.0]])
-    assert fuse(pts_lidar)[0] < 20.5
+    assert np.isclose(fuse(pts_lidar)[0], 20.0)
 
 
 def test_too_few_points_returns_none():

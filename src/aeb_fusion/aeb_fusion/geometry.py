@@ -15,11 +15,15 @@ def project_to_image(pts_lidar: np.ndarray, cam_in_lidar_m: np.ndarray,
 
 def nearest_cluster_xyz(pts_lidar: np.ndarray, u_px: np.ndarray, v_px: np.ndarray, in_front: np.ndarray,
                         box_px: tuple[float, float, float, float], shrink: float, min_points: int,
-                        depth_window_m: float = 1.5) -> np.ndarray | None:
+                        depth_window_m: float = 0.5) -> np.ndarray | None:
     cx_px, cy_px, w_px, h_px = box_px
     in_box = in_front & (np.abs(u_px - cx_px) < w_px * shrink / 2) & (np.abs(v_px - cy_px) < h_px * shrink / 2)
     if in_box.sum() < min_points:
         return None
     pts_box = pts_lidar[in_box]
-    # a distant box is only a few points wide, and road or background hits behind the car would skew a plain median
-    return np.median(pts_box[pts_box[:, 0] < pts_box[:, 0].min() + depth_window_m], axis=0)
+    # the rear surface is the nearest return; a median over a deeper cluster drifts toward the roof and windshield
+    # whenever a sparse scan misses the bumper, which showed up as 0.5 to 0.9 m range bursts
+    near_x_m = pts_box[:, 0].min()
+    xyz_m = np.median(pts_box[pts_box[:, 0] < near_x_m + depth_window_m], axis=0)
+    xyz_m[0] = near_x_m
+    return xyz_m

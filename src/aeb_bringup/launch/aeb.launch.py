@@ -41,7 +41,9 @@ def generate_launch_description():
     scenario_node = Node(package="aeb_bringup", executable="carla_scenario_node", output="screen",
                          parameters=[{"scenario": scenario,
                                       "spectator": ParameterValue(LaunchConfiguration("spectator"), value_type=bool),
-                                      "end_pause_s": ParameterValue(LaunchConfiguration("end_pause_s"), value_type=float)}])
+                                      "end_pause_s": ParameterValue(LaunchConfiguration("end_pause_s"), value_type=float),
+                                      "seed": ParameterValue(LaunchConfiguration("seed"), value_type=int),
+                                      "summary_path": ParameterValue(LaunchConfiguration("summary_path"), value_type=str)}])
     bag = ExecuteProcess(
         cmd=["ros2", "bag", "record", "-s", "mcap", "-o",
              ["bags/", scenario, f"_{stamp}"], *BAG_TOPICS],
@@ -53,5 +55,7 @@ def generate_launch_description():
         DeclareLaunchArgument("record", default_value="false"),
         DeclareLaunchArgument("spectator", default_value="false"),
         DeclareLaunchArgument("end_pause_s", default_value="0.0"),
+        DeclareLaunchArgument("seed", default_value="-1"),
+        DeclareLaunchArgument("summary_path", default_value=""),
         bag, controller, activate, detector, fusion, scenario_node, stop_all, configure,
     ])

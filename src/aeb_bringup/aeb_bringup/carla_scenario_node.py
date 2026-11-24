@@ -1,3 +1,4 @@
+import json
 import math
 import queue
 import time
@@ -14,8 +15,12 @@ from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import Float32, String
 from vision_msgs.msg import Detection3DArray
 
+from .scenario_cfg import jitter_cfg
+
 DT_S = 0.05
 MAX_START_MISALIGN_M = 0.3
+MAX_DRIFT_M = 0.5
+ZERO = carla.Vector3D(0.0, 0.0, 0.0)
 NO_TARGET_GAP_M = 999.0
 STATE_COLORS = {"IDLE": (0, 200, 0), "WARNING": (255, 200, 0), "PARTIAL_BRAKE": (255, 120, 0),
                 "FULL_BRAKE": (255, 0, 0), "HOLD": (0, 120, 255)}
@@ -37,8 +42,13 @@ def is_straight(wp: carla.Waypoint, length_m: float, max_yaw_deg: float = 0.5) -
     return True
 
 
-def hold_speed(actor: carla.Actor, speed_mps: float):
-    actor.set_target_velocity(actor.get_transform().get_forward_vector() * speed_mps)
+def hold_velocity(actor: carla.Actor, direction: carla.Vector3D, speed_mps: float):
+    actor.set_target_velocity(direction * speed_mps)
+    actor.set_target_angular_velocity(ZERO)
+
+
+def path_drift_m(loc: carla.Location, origin: carla.Location, direction: carla.Vector3D) -> float:
+    return abs((loc.x - origin.x) * direction.y - (loc.y - origin.y) * direction.x)
 
 
 def target_speed_mps(cfg: dict, t_s: float) -> float:
@@ -80,15 +90,20 @@ def spawn_target(world: carla.World, ego: carla.Actor, wp_ego: carla.Waypoint, c
         world.tick()
         return None
     lateral_m = cfg.get("lateral_offset_m", 0.0)
-    tgt = spawn_on_lane(world, "vehicle.audi.a2", wp_ego.next(cfg["gap_m"] + 10.0)[0])
+    tgt = spawn_on_lane(world, cfg.get("target_model", "vehicle.audi.a2"), wp_ego.next(cfg["gap_m"] + 10.0)[0])
     actors.append(tgt)
     world.tick()  # in sync mode a spawned actor reports a zero transform until the first tick
-    place_target_ahead(ego, tgt, cfg["gap_m"], lateral_m)
-    world.tick()
-    gap_m, lat_m = gap_to_target(ego, tgt)
+    cmd_gap_m, cmd_lat_m = cfg["gap_m"], lateral_m
+    for _ in range(3):  # some bodies settle a few tenths off their placement, so correct by the measured error
+        place_target_ahead(ego, tgt, cmd_gap_m, cmd_lat_m)
+        world.tick()
+        gap_m, lat_m = gap_to_target(ego, tgt)
+        if abs(gap_m - cfg["gap_m"]) <= MAX_START_MISALIGN_M and abs(lat_m - lateral_m) <= MAX_START_MISALIGN_M:
+            break
+        cmd_gap_m, cmd_lat_m = cmd_gap_m + cfg["gap_m"] - gap_m, cmd_lat_m + lateral_m - lat_m
     if abs(gap_m - cfg["gap_m"]) > MAX_START_MISALIGN_M or abs(lat_m - lateral_m) > MAX_START_MISALIGN_M:
         raise RuntimeError(f"bad start geometry: gap {gap_m:.2f} m, lateral offset {lat_m:.2f} m")
-    hold_speed(tgt, cfg["target_kmh"] / 3.6)
+    hold_velocity(tgt, ego.get_transform().get_forward_vector(), cfg["target_kmh"] / 3.6)
     return tgt
 
 
@@ -149,9 +164,13 @@ class ScenarioNode(Node):
         self.declare_parameter("wait_for_pipeline", True)
         self.declare_parameter("spectator", False)
         self.declare_parameter("end_pause_s", 0.0)
+        self.declare_parameter("seed", -1)
+        self.declare_parameter("summary_path", "")
         self.name = self.get_parameter("scenario").value
         with open(get_package_share_directory("aeb_bringup") + "/config/scenarios.yaml") as f:
             self.cfg = yaml.safe_load(f)[self.name]
+        if self.get_parameter("seed").value >= 0:
+            self.cfg = jitter_cfg(self.cfg, np.random.default_rng(self.get_parameter("seed").value))
 
         self.brake = 0.0
         self.aeb_state: str | None = None
@@ -252,7 +271,8 @@ def run(node: ScenarioNode):
         ego = spawn_on_lane(world, "vehicle.tesla.model3", wp_ego)
         actors.append(ego)
         tgt = spawn_target(world, ego, wp_ego, cfg, actors)
-        hold_speed(ego, cfg["ego_kmh"] / 3.6)
+        ref_dir, ref_origin = ego.get_transform().get_forward_vector(), ego.get_location()
+        hold_velocity(ego, ref_dir, cfg["ego_kmh"] / 3.6)
 
         cam = attach_sensor(world, "sensor.camera.rgb",
                             dict(image_size_x=str(IMG_W_PX), image_size_y=str(IMG_H_PX), fov=str(FOV_DEG)),
@@ -268,19 +288,21 @@ def run(node: ScenarioNode):
 
         duration_s = cfg.get("duration_s", node.get_parameter("timeout_s").value)
         t_s, hold_s, min_gap_m, max_brake, collided, braking_began = 0.0, 0.0, float("inf"), 0.0, False, False
+        first_brake, impact_kmh, prev_speed_kmh, max_drift_m = None, 0.0, 0.0, 0.0
         tick_wall_s = time.monotonic()
         while rclpy.ok() and t_s < duration_s and not collided:
             rclpy.spin_once(node, timeout_sec=0.0)
             braking_began = braking_began or node.brake > 0.0
             if braking_began:  # after a release the car coasts, re-imposing the scripted speed would undo the braking
                 ego.apply_control(carla.VehicleControl(brake=float(node.brake)))
+                ego.set_target_angular_velocity(ZERO)  # the ego has no steering and braking alone has yawed it
             else:
-                hold_speed(ego, cfg["ego_kmh"] / 3.6)
+                hold_velocity(ego, ref_dir, cfg["ego_kmh"] / 3.6)
 
             if tgt is not None and cfg["target_kmh"] == 0:
                 tgt.apply_control(carla.VehicleControl(hand_brake=True))
             elif tgt is not None:
-                hold_speed(tgt, target_speed_mps(cfg, t_s))
+                hold_velocity(tgt, ref_dir, target_speed_mps(cfg, t_s))
 
             # pace to wall clock so the controller's node-clock ttc matches sim time
             time.sleep(max(0.0, DT_S - (time.monotonic() - tick_wall_s)))
@@ -291,6 +313,10 @@ def run(node: ScenarioNode):
             gap_m, lat_m = gap_to_target(ego, tgt) if tgt is not None else (NO_TARGET_GAP_M, 0.0)
             min_gap_m = min(min_gap_m, gap_m)
             max_brake = max(max_brake, node.brake)
+            speed_kmh = ego.get_velocity().length() * 3.6
+            max_drift_m = max(max_drift_m, path_drift_m(ego.get_location(), ref_origin, ref_dir))
+            if node.brake > 0.0 and first_brake is None:
+                first_brake = (gap_m, speed_kmh)
             node.publish_frame(cam_q.get(timeout=2), lidar_q.get(timeout=2), ego, gap_m, lat_m)
             if node.get_parameter("spectator").value:
                 draw_view(world, ego, node, gap_m)
@@ -298,22 +324,34 @@ def run(node: ScenarioNode):
                 event = col_q.get()
                 if tgt is None or event.other_actor.id != tgt.id:
                     raise RuntimeError(f"ego hit {event.other_actor.type_id}, not the target")
+                impact_kmh = prev_speed_kmh  # the speed on the collision tick is already after the impact
                 imp = event.normal_impulse
                 node.pub_col.publish(Float32(data=float(math.hypot(imp.x, imp.y, imp.z))))
                 collided = True
 
+            prev_speed_kmh = speed_kmh
             if ego.get_velocity().length() < 0.1 and braking_began:
                 hold_s += DT_S
                 if hold_s > 1.0:
                     break
 
         # overlapping the target without a collision event means the geometry is wrong, not that the AEB worked
-        if cfg.get("false_positive"):
+        if max_drift_m > MAX_DRIFT_M:  # the ego left its line, so the run no longer tests what it says it tests
+            result = "INVALID"
+        elif cfg.get("false_positive"):
             result = "FALSE_BRAKE" if max_brake > 0.0 else "COLLISION" if collided else "PASS"
         else:
             result = "COLLISION" if collided else "INVALID" if min_gap_m < -0.3 else "PASS"
-        node.get_logger().info(f"{node.name}: {result} (t={t_s:.1f}s, min gap {min_gap_m:.2f} m)")
+        node.get_logger().info(f"{node.name}: {result} (t={t_s:.1f}s, min gap {min_gap_m:.2f} m, drift {max_drift_m:.2f} m)")
         node.pub_res.publish(String(data=f"{node.name}:{result}:min_gap={min_gap_m:.2f}"))
+        summary_path = node.get_parameter("summary_path").value
+        if summary_path:
+            with open(summary_path, "w") as f:
+                json.dump(dict(scenario=node.name, seed=node.get_parameter("seed").value, result=result, min_gap_m=min_gap_m,
+                               max_brake=max_brake, max_drift_m=max_drift_m, duration_s=t_s, impact_kmh=impact_kmh if collided else 0.0,
+                               first_brake_gap_m=first_brake[0] if first_brake else None,
+                               first_brake_kmh=first_brake[1] if first_brake else None,
+                               **{k: cfg[k] for k in ("ego_kmh", "target_kmh", "gap_m", "lateral_offset_m", "target_model", "brake_after_s", "false_positive") if k in cfg}), f)
         time.sleep(node.get_parameter("end_pause_s").value)  # the sync-mode window holds the last frame
     finally:
         for actor in reversed(actors):

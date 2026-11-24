@@ -10,10 +10,19 @@ from aeb_fusion.geometry import nearest_cluster_xyz, project_to_image
 
 BAGS = ["CCRs_20", "CCRs_30", "CCRs_40", "CCRs_50", "CCRm_50_20", "CCRb_50_d2"]
 CAM_IN_LIDAR_M = np.array([1.5, 0.0, -0.2])
-BUMPER_M = 2.4
+BUMPER_M = 2.5
 IN_LANE_PX = 120
 GAP_BINS_M = [(5, 15), (15, 25), (25, 35), (35, 45), (45, 60)]
 WRONG_ERR_M = 2.0
+
+
+def median_cluster_xyz(pts_lidar, u_px, v_px, in_front, box_px, shrink, min_points, depth_window_m):
+    cx_px, cy_px, w_px, h_px = box_px
+    in_box = in_front & (np.abs(u_px - cx_px) < w_px * shrink / 2) & (np.abs(v_px - cy_px) < h_px * shrink / 2)
+    if in_box.sum() < min_points:
+        return None
+    pts_box = pts_lidar[in_box]
+    return np.median(pts_box[pts_box[:, 0] < pts_box[:, 0].min() + depth_window_m], axis=0)
 
 
 def median_xyz_in_box(pts_lidar, u_px, v_px, in_front, box_px, shrink, min_points):
@@ -23,19 +32,19 @@ def median_xyz_in_box(pts_lidar, u_px, v_px, in_front, box_px, shrink, min_point
 
 
 def nearest_z_filtered_xyz(pts_lidar, u_px, v_px, in_front, box_px, min_points, z_min_m):
-    return nearest_cluster_xyz(pts_lidar[pts_lidar[:, 2] > z_min_m], u_px[pts_lidar[:, 2] > z_min_m],
-                               v_px[pts_lidar[:, 2] > z_min_m], in_front[pts_lidar[:, 2] > z_min_m],
-                               box_px, 1.0, min_points)
+    keep = pts_lidar[:, 2] > z_min_m
+    return median_cluster_xyz(pts_lidar[keep], u_px[keep], v_px[keep], in_front[keep], box_px, 1.0, min_points, 1.5)
 
 
 VARIANTS = {
     "A current (shrink .5, min 3, median)": lambda *a: median_xyz_in_box(*a, 0.5, 3),
     "B shrink .8, min 3, median": lambda *a: median_xyz_in_box(*a, 0.8, 3),
     "C shrink .8, min 2, median": lambda *a: median_xyz_in_box(*a, 0.8, 2),
-    "D full box, min 2, nearest cluster": lambda *a: nearest_cluster_xyz(*a, 1.0, 2),
-    "E shrink .8, min 2, nearest cluster": lambda *a: nearest_cluster_xyz(*a, 0.8, 2),
+    "D full box, min 2, median of nearest cluster": lambda *a: median_cluster_xyz(*a, 1.0, 2, 1.5),
+    "E shrink .8, min 2, median of nearest cluster": lambda *a: median_cluster_xyz(*a, 0.8, 2, 1.5),
     "F full box, min 2, nearest, z>-1.5": lambda *a: nearest_z_filtered_xyz(*a, 2, -1.5),
     "G full box, min 1, nearest, z>-1.5": lambda *a: nearest_z_filtered_xyz(*a, 1, -1.5),
+    "H full box, min 2, nearest point as range": lambda *a: nearest_cluster_xyz(*a, 1.0, 2, 0.5),
 }
 
 

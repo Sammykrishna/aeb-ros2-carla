@@ -8,7 +8,7 @@ aeb_controller:
     margin_m: 3.0
     brake_decay_per_s: 0.6
     confirm_s: 0.1
-    min_target_decel_mps2: 2.0
+    min_target_decel_mps2: 1.5
     hold_time_s: 2.0
     rate_hz: 50.0
 yolo_detector:
@@ -20,4 +20,4 @@ yolo_detector:
 aeb_fusion:
   ros__parameters:
     cam_in_lidar_xyz: [1.5, 0.0, -0.2]
-    bumper_offset_m: 2.4
+    bumper_offset_m: 2.5

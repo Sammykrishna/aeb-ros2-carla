@@ -26,7 +26,7 @@ class AebParams:
     brake_decay_per_s: float = 0.6
     latency_s: float = 0.2
     margin_m: float = 3.0
-    min_target_decel_mps2: float = 2.0
+    min_target_decel_mps2: float = 1.5
     strong_target_decel_mps2: float = 4.0
     target_decel_confirm_s: float = 0.5
     confirm_s: float = 0.1
@@ -36,6 +36,7 @@ class AebParams:
     release_ratio: float = 0.25
     release_s: float = 1.0
     min_closing_speed_mps: float = 0.5
+    max_closing_excess_mps: float = 1.0
     min_dwell_s: float = 0.4
     stopped_speed_mps: float = 0.1
     hold_time_s: float = 2.0
@@ -60,6 +61,8 @@ def lead_range_m(pts_xy_m: np.ndarray, half_width_m: float = 1.5) -> float | Non
 
 def required_decel_mps2(range_m: float, closing_mps: float, ego_speed_mps: float,
                         target_decel_mps2: float, p: AebParams) -> float:
+    # a target cannot close faster than the ego drives, so a bigger estimate is a range glitch
+    closing_mps = min(closing_mps, ego_speed_mps + p.max_closing_excess_mps)
     if closing_mps < p.min_closing_speed_mps:
         return 0.0
     eff_range_m = max(range_m - closing_mps * p.latency_s - p.margin_m, 0.1)

@@ -14,10 +14,10 @@ class FusionNode(Node):
     def __init__(self):
         super().__init__("aeb_fusion")
         self.declare_parameter("cam_in_lidar_xyz", [1.5, 0.0, -0.2])
-        self.declare_parameter("bumper_offset_m", 2.4)
+        self.declare_parameter("bumper_offset_m", 2.5)
         self.declare_parameter("box_shrink", 1.0)
         self.declare_parameter("min_points", 2)
-        self.declare_parameter("depth_window_m", 1.5)
+        self.declare_parameter("depth_window_m", 0.5)
         self.declare_parameter("slop_s", 0.05)
         self.K: np.ndarray | None = None
 

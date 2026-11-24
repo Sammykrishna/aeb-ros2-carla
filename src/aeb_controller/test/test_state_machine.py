@@ -190,3 +190,17 @@ def test_full_brake_steps_down_to_partial_when_the_demand_falls():
     assert settle(sm, 8.0, 30.0, 8.0, t0_s=0.1, secs=0.2)[0] == AebState.FULL_BRAKE
     st, brake, _, _ = settle(sm, 8.0, 30.0, 8.0, t0_s=0.4, secs=0.5)
     assert st == AebState.PARTIAL_BRAKE and brake < 1.0
+
+
+def test_closing_speed_is_clamped_to_what_the_ego_can_physically_close():
+    glitch = required_decel_mps2(67.0, 30.0, 5.6, 0.0, P)
+    assert glitch == pytest.approx(required_decel_mps2(67.0, 5.6 + P.max_closing_excess_mps, 5.6, 0.0, P))
+    assert glitch / P.max_decel_mps2 < P.warn_ratio
+
+
+def test_a_range_glitch_on_a_stationary_target_far_away_does_not_brake():
+    sm = AebStateMachine()
+    out = None
+    for i, (range_m, closing_mps) in enumerate([(75.3, 4.0), (67.7, 30.0), (70.0, 22.0), (67.1, 18.0)]):
+        out = settle(sm, 5.6, range_m, closing_mps, t0_s=i * 0.25, secs=0.2)
+    assert out[0] in (AebState.IDLE, AebState.WARNING) and out[1] == 0.0

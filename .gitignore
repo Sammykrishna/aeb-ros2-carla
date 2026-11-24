@@ -14,3 +14,5 @@ carla_*.log
 
 # model weights download automatically on first use
 *.pt
+regression_runs/
+regression_runs*/
