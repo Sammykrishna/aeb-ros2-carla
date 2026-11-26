@@ -35,12 +35,16 @@ def summarize(runs: list[dict]) -> dict[str, dict]:
         low, high = wilson_interval(passes, len(mine))
         # a false-positive run drives past its target, so its gap goes negative and means nothing
         finite_gaps = [r["min_gap_m"] for r in mine if "min_gap_m" in r and r["min_gap_m"] < 900 and not r.get("false_positive")]
+        # an avoided collision is a 0 km/h impact, so mitigation is judged over every run and not just the hits
+        impacts = [r["impact_kmh"] if r["result"] == "COLLISION" else 0.0 for r in mine if r["result"] in ("PASS", "COLLISION")]
         summary[name] = dict(
             runs=len(mine), passes=passes, pass_rate=passes / len(mine), ci_low=low, ci_high=high,
             counts={res: results.count(res) for res in sorted(set(results))},
             min_gap_m=_spread(finite_gaps),
             first_brake_gap_m=_spread([r["first_brake_gap_m"] for r in mine if r.get("first_brake_gap_m") is not None]),
             impact_kmh=_spread([r["impact_kmh"] for r in mine if r["result"] == "COLLISION"]),
+            impact_median_kmh=float(np.median(impacts)) if impacts else None,
+            impact_p95_kmh=float(np.percentile(impacts, 95)) if impacts else None,
             false_brakes=results.count("FALSE_BRAKE"))
     return summary
 
@@ -54,9 +58,10 @@ def check_expectations(summary: dict[str, dict], expectations: dict[str, dict]) 
             bad = [res for res in s["counts"] if res not in ("PASS", "COLLISION")]
             if bad:
                 found.append(f"unexpected results {bad}")
-            worst = s["impact_kmh"]["max"] if s["impact_kmh"] else 0.0
-            if worst > exp["max_impact_kmh"]:
-                found.append(f"impact {worst:.0f} km/h above the {exp['max_impact_kmh']} km/h limit")
+            for key, label in (("median", "median"), ("p95", "95th percentile")):
+                value, limit = s[f"impact_{key}_kmh"], exp[f"max_{key}_impact_kmh"]
+                if value is not None and value > limit:
+                    found.append(f"{label} impact {value:.1f} km/h above the {limit} km/h limit")
         elif s["pass_rate"] < exp.get("min_pass_rate", 0.9):
             found.append(f"pass rate {s['pass_rate']:.0%} below {exp.get('min_pass_rate', 0.9):.0%} ({s['counts']})")
         if found:

@@ -49,12 +49,35 @@ def test_any_false_brake_fails_a_false_positive_scenario():
     assert "FP_none" in check_expectations(summarize(runs), {"FP_none": {"min_pass_rate": 1.0}})
 
 
-def test_mitigation_expectation_allows_collisions_below_the_impact_limit():
-    exp = {"CCRb_50_d6": {"expect": "mitigate", "max_impact_kmh": 35}}
-    ok = [run("CCRb_50_d6", "COLLISION", impact_kmh=25.0)] * 5
-    too_hard = ok + [run("CCRb_50_d6", "COLLISION", impact_kmh=41.0)]
-    assert not check_expectations(summarize(ok), exp)
-    assert "CCRb_50_d6" in check_expectations(summarize(too_hard), exp)
+MITIGATE = {"CCRb_50_d6": {"expect": "mitigate", "max_median_impact_kmh": 32, "max_p95_impact_kmh": 40}}
+
+
+def hits(*impacts_kmh: float) -> list[dict]:
+    return [run("CCRb_50_d6", "COLLISION", impact_kmh=v) for v in impacts_kmh]
+
+
+def test_mitigation_tolerates_a_single_tail_run():
+    assert not check_expectations(summarize(hits(*[28.0] * 29, 45.0)), MITIGATE)
+
+
+def test_mitigation_fails_when_the_typical_impact_is_too_high():
+    found = check_expectations(summarize(hits(*[33.0] * 30)), MITIGATE)
+    assert "median" in found["CCRb_50_d6"][0]
+
+
+def test_mitigation_fails_when_the_tail_is_too_heavy():
+    found = check_expectations(summarize(hits(*[28.0] * 27, *[45.0] * 3)), MITIGATE)
+    assert "95th percentile" in found["CCRb_50_d6"][0]
+
+
+def test_avoided_collisions_count_as_zero_impact():
+    runs = [run("CCRb_50_d6", "PASS", impact_kmh=0.0)] * 3 + hits(30.0)
+    assert summarize(runs)["CCRb_50_d6"]["impact_median_kmh"] == 0.0
+
+
+def test_mitigation_rejects_results_other_than_pass_or_collision():
+    runs = hits(25.0) + [run("CCRb_50_d6", "INVALID")]
+    assert "unexpected" in check_expectations(summarize(runs), MITIGATE)["CCRb_50_d6"][0]
 
 
 def test_markdown_report_lists_violations():

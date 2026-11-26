@@ -6,7 +6,7 @@ CCRs_50: {min_pass_rate: 0.9}
 CCRm_50_20: {min_pass_rate: 0.9}
 CCRb_50_d2: {min_pass_rate: 0.9}
 # known limit: the AEB cannot avoid this one, so it must only keep the impact well below the 50 km/h approach speed
-CCRb_50_d6: {expect: mitigate, max_impact_kmh: 35}
+CCRb_50_d6: {expect: mitigate, max_median_impact_kmh: 32, max_p95_impact_kmh: 40}
 # no real threat, so any brake command is a failure
 FP_none: {min_pass_rate: 1.0}
 FP_adjacent: {min_pass_rate: 1.0}

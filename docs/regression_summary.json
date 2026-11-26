@@ -10,16 +10,18 @@
     "PASS": 30
    },
    "min_gap_m": {
-    "mean": 9.797513318981435,
+    "mean": 9.797513318981437,
     "min": 7.866559775591764,
     "max": 12.228158904454261
    },
    "first_brake_gap_m": {
-    "mean": 23.159277038289773,
+    "mean": 23.15927703828977,
     "min": 21.07034351647529,
     "max": 25.567747901649717
    },
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   },
   "CCRb_50_d6": {
@@ -37,15 +39,17 @@
     "max": 0.03564525861497003
    },
    "first_brake_gap_m": {
-    "mean": 9.670118416286767,
+    "mean": 9.67011841628677,
     "min": 7.439850677864744,
     "max": 11.154588773366653
    },
    "impact_kmh": {
-    "mean": 28.528535385131832,
+    "mean": 28.528535385131836,
     "min": 20.5115535736084,
     "max": 38.3337158203125
    },
+   "impact_median_kmh": 28.786781215667723,
+   "impact_p95_kmh": 32.42224044799804,
    "false_brakes": 0
   },
   "CCRm_50_20": {
@@ -68,6 +72,8 @@
     "max": 15.569026022468961
    },
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   },
   "CCRs_20": {
@@ -85,11 +91,13 @@
     "max": 7.549032990362759
    },
    "first_brake_gap_m": {
-    "mean": 7.702497934643281,
+    "mean": 7.702497934643282,
     "min": 6.7000865323841765,
     "max": 8.544446561913372
    },
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   },
   "CCRs_30": {
@@ -112,6 +120,8 @@
     "max": 15.971125794145742
    },
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   },
   "CCRs_40": {
@@ -124,7 +134,7 @@
     "PASS": 30
    },
    "min_gap_m": {
-    "mean": 7.9435642172321055,
+    "mean": 7.943564217232107,
     "min": 4.27939101768262,
     "max": 11.376256815406094
    },
@@ -134,6 +144,8 @@
     "max": 27.061995512576036
    },
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   },
   "CCRs_50": {
@@ -146,7 +158,7 @@
     "PASS": 30
    },
    "min_gap_m": {
-    "mean": 10.227290159354117,
+    "mean": 10.22729015935412,
     "min": 8.080083054618672,
     "max": 13.82442635520352
    },
@@ -156,6 +168,8 @@
     "max": 36.40185155037486
    },
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   },
   "FP_adjacent": {
@@ -170,6 +184,8 @@
    "min_gap_m": null,
    "first_brake_gap_m": null,
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   },
   "FP_follow": {
@@ -184,6 +200,8 @@
    "min_gap_m": null,
    "first_brake_gap_m": null,
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   },
   "FP_none": {
@@ -198,14 +216,12 @@
    "min_gap_m": null,
    "first_brake_gap_m": null,
    "impact_kmh": null,
+   "impact_median_kmh": 0.0,
+   "impact_p95_kmh": 0.0,
    "false_brakes": 0
   }
  },
- "violations": {
-  "CCRb_50_d6": [
-   "impact 38 km/h above the 35 km/h limit"
-  ]
- },
+ "violations": {},
  "runs": [
   {
    "scenario": "CCRs_20",

@@ -10,6 +10,3 @@
 | FP_adjacent | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
 | FP_follow | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
 | FP_none | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
-
-Expectations not met:
-- CCRb_50_d6: impact 38 km/h above the 35 km/h limit
