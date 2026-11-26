@@ -16,3 +16,4 @@ carla_*.log
 *.pt
 regression_runs/
 regression_runs*/
+sweep_runs*/

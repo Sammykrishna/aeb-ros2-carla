@@ -186,12 +186,43 @@ def regression_gaps():
     ax.set_ylabel("Distance left to the target (m)")
     ax.grid(axis="x", visible=False)
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), frameon=False, fontsize=9.5, ncol=3)
-    ax.set_title("Ten varied runs per scenario: stopping distance and the runs that failed", loc="left", fontsize=12.5, color=INK)
+    ax.set_title("Thirty varied runs per scenario: stopping distance and the runs that failed", loc="left", fontsize=12.5, color=INK)
     fig.tight_layout()
     fig.savefig(f"{OUT}/regression_gaps.png", dpi=160)
 
 
+def sweep_load():
+    rmws = [("fastrtps", "Fast DDS\nshared memory"), ("fastrtps_udp", "Fast DDS\nUDP only"), ("cyclonedds", "Cyclone DDS"), ("zenoh", "Zenoh")]
+    profiles = [("be1", "1"), ("be5", "5"), ("rel1", "1"), ("rel10", "10")]
+    sweep = json.load(open("docs/sweep_load16_summary.json"))
+    fig, axes = plt.subplots(2, 4, figsize=(11, 6.2), sharey=True)
+    for col, (rmw, label) in enumerate(rmws):
+        for row, measure in enumerate(("delivered", "passed")):
+            ax = axes[row, col]
+            for x, (qos, _) in enumerate(profiles):
+                runs = sweep[f"{rmw}_{qos}_load16"]
+                value = (np.mean([r["objects_received"] / r["frames_sent"] for r in runs]) if measure == "delivered"
+                         else np.mean([r["result"] == "PASS" for r in runs])) * 100
+                ax.bar(x, value, 0.62, color=ORANGE if qos.startswith("be") else BLUE)
+            ax.set_xticks(range(4), [d for _, d in profiles])
+            ax.set_ylim(0, 100)
+            ax.set_yticks([0, 50, 100])
+            ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter())
+            ax.grid(axis="x", visible=False)
+            if row == 0:
+                ax.set_title(label, fontsize=11, color=INK)
+            if col == 0:
+                ax.set_ylabel("Detections delivered" if row == 0 else "Runs without a collision")
+            if row == 1:
+                ax.set_xlabel("queue depth", fontsize=9.5)
+    fig.legend(handles=[matplotlib.patches.Patch(color=ORANGE, label="Best effort"), matplotlib.patches.Patch(color=BLUE, label="Reliable")],
+               loc="lower center", ncol=2, frameon=False, fontsize=10)
+    fig.suptitle("With every core busy, Fast DDS best effort drops most detections and Cyclone and Zenoh do not", x=0.01, ha="left", fontsize=12.5, color=INK)
+    fig.tight_layout(rect=(0, 0.05, 1, 0.96))
+    fig.savefig(f"{OUT}/sweep_load.png", dpi=160)
+
+
 if __name__ == "__main__":
-    for make in (fusion_by_distance, detector_tradeoff, timelines, stop_gaps, regression_gaps):
+    for make in (fusion_by_distance, detector_tradeoff, timelines, stop_gaps, regression_gaps, sweep_load):
         make()
         print("wrote", make.__name__)

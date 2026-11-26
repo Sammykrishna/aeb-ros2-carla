@@ -3,6 +3,7 @@ from dataclasses import asdict
 
 import numpy as np
 import rclpy
+from aeb_common.qos import declare_stream_qos
 from nav_msgs.msg import Odometry
 from rclpy.lifecycle import Node, State, TransitionCallbackReturn
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
@@ -13,8 +14,6 @@ from vision_msgs.msg import Detection3DArray
 from .state_machine import AebParams, AebStateMachine, lead_range_m
 from .tracking import RangeTracker
 
-SENSOR_QOS = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
-                        history=HistoryPolicy.KEEP_LAST, depth=1)
 CMD_QOS = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE,
                      history=HistoryPolicy.KEEP_LAST, depth=1)
 MAX_TARGET_DECEL_MPS2 = 10.0
@@ -28,6 +27,7 @@ class AebController(Node):
         self.declare_parameter("rate_hz", 50.0)
         self.declare_parameter("object_timeout_s", 0.3)
         self.declare_parameter("track_window_s", 1.0)
+        self.stream_qos = declare_stream_qos(self)
         self.ego_speed_mps = 0.0
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -39,8 +39,8 @@ class AebController(Node):
                      self.create_lifecycle_publisher(String, "/aeb/state", CMD_QOS),
                      self.create_lifecycle_publisher(Float32, "/aeb/ttc", CMD_QOS),
                      self.create_lifecycle_publisher(Float32, "/aeb/required_decel", CMD_QOS)]
-        self.subs = [self.create_subscription(Detection3DArray, "/aeb/objects_3d", self._on_objects, SENSOR_QOS),
-                     self.create_subscription(Odometry, "/ego/odom", self._on_odom, SENSOR_QOS)]
+        self.subs = [self.create_subscription(Detection3DArray, "/aeb/objects_3d", self._on_objects, self.stream_qos),
+                     self.create_subscription(Odometry, "/ego/odom", self._on_odom, self.stream_qos)]
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:

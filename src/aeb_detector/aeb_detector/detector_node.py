@@ -1,7 +1,7 @@
 import numpy as np
 import rclpy
+from aeb_common.qos import declare_stream_qos
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from ultralytics import YOLO
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
@@ -20,9 +20,10 @@ class YoloDetector(Node):
         self.model = YOLO(self.get_parameter("model").value)
         # the first cuda inference takes ~3 s, so pay for it before subscribing to images
         self._predict(np.zeros((540, 960, 3), np.uint8))
-        self.pub = self.create_publisher(Detection2DArray, "/aeb/detections_2d", 1)
+        qos = declare_stream_qos(self)
+        self.pub = self.create_publisher(Detection2DArray, "/aeb/detections_2d", qos)
         self.create_subscription(Image, self.get_parameter("image_topic").value,
-                                 self._on_image, qos_profile_sensor_data)
+                                 self._on_image, qos)
 
     def _predict(self, img_bgr: np.ndarray):
         return self.model.predict(img_bgr, conf=self.get_parameter("conf").value,

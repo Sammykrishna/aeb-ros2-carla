@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from aeb_bringup.regression_stats import check_expectations, markdown_report, summarize, wilson_interval
+from aeb_bringup.regression_stats import (check_expectations, latency_rollup, latency_summary, markdown_report, summarize,
+                                          wilson_interval)
 from aeb_bringup.scenario_cfg import TARGET_MODELS, jitter_cfg
 
 CCR = dict(type="stationary", ego_kmh=50, target_kmh=0, gap_m=80)
@@ -84,3 +85,23 @@ def test_jitter_moves_the_braking_onset_of_a_braking_lead():
 def test_summarize_skips_the_gap_of_false_positive_runs_that_drive_past_the_target():
     runs = [dict(scenario="FP_adjacent", seed=0, result="PASS", min_gap_m=-57.0, false_positive=True)]
     assert summarize(runs)["FP_adjacent"]["min_gap_m"] is None
+
+
+def test_latency_summary_percentiles():
+    out = latency_summary([10.0, 20.0, 30.0, 40.0, 100.0])
+    assert out["objects_received"] == 5
+    assert out["latency_p50_ms"] == 30.0
+    assert out["latency_max_ms"] == 100.0
+
+
+def test_latency_summary_without_objects():
+    assert latency_summary([])["latency_p50_ms"] is None
+
+
+def test_latency_rollup_delivered_fraction():
+    runs = [dict(frames_sent=100, objects_received=90, latency_p50_ms=20.0, latency_p95_ms=40.0, latency_max_ms=60.0),
+            dict(frames_sent=100, objects_received=100, latency_p50_ms=30.0, latency_p95_ms=50.0, latency_max_ms=90.0)]
+    out = latency_rollup(runs)
+    assert out["delivered"] == 0.95
+    assert out["p50_ms"] == 25.0
+    assert out["worst_ms"] == 90.0

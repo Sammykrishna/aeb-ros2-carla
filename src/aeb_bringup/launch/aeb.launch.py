@@ -24,9 +24,11 @@ def generate_launch_description():
     params = os.path.join(get_package_share_directory("aeb_bringup"), "config", "aeb_params.yaml")
     scenario = LaunchConfiguration("scenario")
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    qos = {"qos_reliability": LaunchConfiguration("qos_reliability"),
+           "qos_depth": ParameterValue(LaunchConfiguration("qos_depth"), value_type=int)}
 
     controller = LifecycleNode(package="aeb_controller", executable="aeb_controller_node",
-                               name="aeb_controller", namespace="", parameters=[params], output="screen")
+                               name="aeb_controller", namespace="", parameters=[params, qos], output="screen")
     configure = EmitEvent(event=ChangeState(
         lifecycle_node_matcher=matches_action(controller),
         transition_id=Transition.TRANSITION_CONFIGURE))
@@ -36,14 +38,15 @@ def generate_launch_description():
             lifecycle_node_matcher=matches_action(controller),
             transition_id=Transition.TRANSITION_ACTIVATE))]))
 
-    detector = Node(package="aeb_detector", executable="yolo_detector_node", parameters=[params], output="screen")
-    fusion = Node(package="aeb_fusion", executable="fusion_node", parameters=[params], output="screen")
+    detector = Node(package="aeb_detector", executable="yolo_detector_node", parameters=[params, qos], output="screen")
+    fusion = Node(package="aeb_fusion", executable="fusion_node", parameters=[params, qos], output="screen")
     scenario_node = Node(package="aeb_bringup", executable="carla_scenario_node", output="screen",
-                         parameters=[{"scenario": scenario,
+                         parameters=[qos, {"scenario": scenario,
                                       "spectator": ParameterValue(LaunchConfiguration("spectator"), value_type=bool),
                                       "end_pause_s": ParameterValue(LaunchConfiguration("end_pause_s"), value_type=float),
                                       "seed": ParameterValue(LaunchConfiguration("seed"), value_type=int),
                                       "summary_path": ParameterValue(LaunchConfiguration("summary_path"), value_type=str)}])
+    probe = Node(package="aeb_bringup", executable="latency_probe_node", parameters=[qos], output="screen")
     bag = ExecuteProcess(
         cmd=["ros2", "bag", "record", "-s", "mcap", "-o",
              ["bags/", scenario, f"_{stamp}"], *BAG_TOPICS],
@@ -57,5 +60,7 @@ def generate_launch_description():
         DeclareLaunchArgument("end_pause_s", default_value="0.0"),
         DeclareLaunchArgument("seed", default_value="-1"),
         DeclareLaunchArgument("summary_path", default_value=""),
-        bag, controller, activate, detector, fusion, scenario_node, stop_all, configure,
+        DeclareLaunchArgument("qos_reliability", default_value="reliable"),
+        DeclareLaunchArgument("qos_depth", default_value="10"),
+        bag, controller, activate, detector, fusion, probe, scenario_node, stop_all, configure,
     ])

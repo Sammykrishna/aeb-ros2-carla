@@ -8,6 +8,7 @@
   <license>Apache-2.0</license>
 
   <depend>launch</depend>
+  <depend>aeb_common</depend>
   <depend>launch_ros</depend>
   <depend>launch_testing</depend>
   <depend>launch_testing_ros</depend>

@@ -2,7 +2,7 @@ import message_filters
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from aeb_common.qos import declare_stream_qos
 from sensor_msgs.msg import CameraInfo, PointCloud2
 from sensor_msgs_py import point_cloud2
 from vision_msgs.msg import Detection2DArray, Detection3D, Detection3DArray
@@ -20,13 +20,14 @@ class FusionNode(Node):
         self.declare_parameter("depth_window_m", 0.5)
         self.declare_parameter("slop_s", 0.05)
         self.K: np.ndarray | None = None
+        qos = declare_stream_qos(self)
 
-        self.pub = self.create_publisher(Detection3DArray, "/aeb/objects_3d", 1)
-        self.create_subscription(CameraInfo, "/ego/camera/camera_info", self._on_info, qos_profile_sensor_data)
+        self.pub = self.create_publisher(Detection3DArray, "/aeb/objects_3d", qos)
+        self.create_subscription(CameraInfo, "/ego/camera/camera_info", self._on_info, qos)
         dets_sub = message_filters.Subscriber(self, Detection2DArray, "/aeb/detections_2d",
-                                              qos_profile=qos_profile_sensor_data)
+                                              qos_profile=qos)
         cloud_sub = message_filters.Subscriber(self, PointCloud2, "/ego/lidar/points",
-                                               qos_profile=qos_profile_sensor_data)
+                                               qos_profile=qos)
         self.sync = message_filters.ApproximateTimeSynchronizer(
             [dets_sub, cloud_sub], 5, self.get_parameter("slop_s").value)
         self.sync.registerCallback(self._on_sync)

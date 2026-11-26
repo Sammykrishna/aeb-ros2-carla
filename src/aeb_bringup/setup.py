@@ -29,6 +29,7 @@ setup(
     entry_points={
         'console_scripts': [
             'carla_scenario_node = aeb_bringup.carla_scenario_node:main',
+            'latency_probe_node = aeb_bringup.latency_probe:main',
         ],
     },
 )

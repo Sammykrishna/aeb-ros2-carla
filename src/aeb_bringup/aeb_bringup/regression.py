@@ -44,14 +44,15 @@ def kill_group(pid: int, sig: int):
         pass
 
 
-def run_one(name: str, seed: int, out_dir: Path | str) -> dict:
+def run_one(name: str, seed: int, out_dir: Path | str, launch_args: list[str] = (), env: dict | None = None) -> dict:
     path = Path(out_dir) / name / f"{seed}.json"
     if path.exists():
         return json.loads(path.read_text())
     path.parent.mkdir(parents=True, exist_ok=True)
     cmd = ["ros2", "launch", "aeb_bringup", "aeb.launch.py", f"scenario:={name}", f"seed:={seed}",
-           f"summary_path:={path}", "record:=false"]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+           f"summary_path:={path}", "record:=false", *launch_args]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True,
+                            env={**os.environ, **(env or {})})
     try:
         out, _ = proc.communicate(timeout=LAUNCH_TIMEOUT_S)
     except subprocess.TimeoutExpired:
@@ -65,14 +66,15 @@ def run_one(name: str, seed: int, out_dir: Path | str) -> dict:
     return dict(scenario=name, seed=seed, result="ERROR", detail=out[-600:])
 
 
-def run_all(scenarios: list[str], runs: int, out_dir: Path | str, seed0: int = 0, retries: int = 1) -> list[dict]:
+def run_all(scenarios: list[str], runs: int, out_dir: Path | str, seed0: int = 0, retries: int = 1,
+            launch_args: list[str] = (), env: dict | None = None) -> list[dict]:
     results = []
     for name in scenarios:
         for seed in range(seed0, seed0 + runs):
             if not carla_up():
                 sys.exit(f"CARLA stopped answering before {name} seed {seed}; rerun the same command to resume")
             for _ in range(retries + 1):
-                result = run_one(name, seed, out_dir)
+                result = run_one(name, seed, out_dir, launch_args, env)
                 if result["result"] != "ERROR":
                     break
             print(f"{name:<12} seed {seed:>3}: {result['result']:<11} min gap {result.get('min_gap_m', float('nan')):7.2f} m", flush=True)

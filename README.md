@@ -35,7 +35,7 @@ There are four packages.
 
 `aeb_detector` runs YOLO11s at 960 px and publishes 2D boxes. `aeb_fusion` projects the LiDAR points into each box and takes the depth of the nearest cluster, which gives a 3D position for the car. `aeb_controller` is a ROS 2 lifecycle node. It tracks the range over the last second, works out how fast the gap is closing, and decides what to do. `aeb_bringup` holds the launch file, the scenario definitions, the CARLA bridge that talks to the simulator, rosbag recording and the launch tests.
 
-Safety critical commands use a reliable QoS profile and sensor streams use best effort with a queue of one, so a slow consumer never works from stale data. The controller also goes by the timestamp on each message, not the time it arrived, because queueing jitter at 14 m/s looks like metres of range noise.
+Safety critical commands use a reliable QoS profile and sensor streams default to reliable with a queue of ten. Both are launch parameters, and the middleware sweep below explains why I settled on those values. The controller also goes by the timestamp on each message, not the time it arrived, because queueing jitter at 14 m/s looks like metres of range noise.
 
 ### How the controller decides
 
@@ -102,24 +102,47 @@ A single run proves very little, so I added a regression test that runs every sc
 
 | Scenario | Runs | Pass | Pass rate | 95% interval | Min gap, mean (range) | First brake, mean | Worst impact |
 |---|---|---|---|---|---|---|---|
-| CCRb_50_d2 | 30 | 30 | 100% | 89% to 100% | 9.2 m (3.3 to 12.2) | 23.0 m | none |
-| CCRb_50_d6 | 30 | 0 | 0% | 0% to 11% | -0.0 m (-0.1 to 0.0) | 9.7 m | 33 km/h |
-| CCRm_50_20 | 30 | 30 | 100% | 89% to 100% | 5.3 m (3.4 to 6.6) | 14.0 m | none |
-| CCRs_20 | 30 | 30 | 100% | 89% to 100% | 6.8 m (4.4 to 7.5) | 7.9 m | none |
-| CCRs_30 | 30 | 30 | 100% | 89% to 100% | 9.4 m (7.8 to 10.1) | 14.2 m | none |
-| CCRs_40 | 30 | 30 | 100% | 89% to 100% | 7.6 m (4.2 to 11.4) | 22.5 m | none |
-| CCRs_50 | 30 | 30 | 100% | 89% to 100% | 9.9 m (8.4 to 13.2) | 33.4 m | none |
+| CCRb_50_d2 | 30 | 30 | 100% | 89% to 100% | 9.8 m (7.9 to 12.2) | 23.2 m | none |
+| CCRb_50_d6 | 30 | 0 | 0% | 0% to 11% | -0.0 m (-0.1 to 0.0) | 9.7 m | 38 km/h |
+| CCRm_50_20 | 30 | 30 | 100% | 89% to 100% | 5.3 m (3.5 to 6.4) | 13.7 m | none |
+| CCRs_20 | 30 | 30 | 100% | 89% to 100% | 6.6 m (4.3 to 7.5) | 7.7 m | none |
+| CCRs_30 | 30 | 30 | 100% | 89% to 100% | 9.2 m (8.1 to 10.0) | 14.0 m | none |
+| CCRs_40 | 30 | 30 | 100% | 89% to 100% | 7.9 m (4.3 to 11.4) | 22.2 m | none |
+| CCRs_50 | 30 | 30 | 100% | 89% to 100% | 10.2 m (8.1 to 13.8) | 33.3 m | none |
 | FP_adjacent | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
 | FP_follow | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
 | FP_none | 30 | 30 | 100% | 89% to 100% | none | no brake | none |
 
-All 300 runs finished and every scenario met its expectation. Nine scenarios passed all thirty runs, including every false-positive check: 90 runs with no brake command on the empty road, in the next lane or while following closely. Thirty clean runs only show that the pass rate is at least about 89 percent, so a clean streak is good evidence and not a guarantee.
+All 300 runs finished, using the final QoS defaults of reliable with a queue of 10. Switching from best effort changed almost nothing on an idle machine, which is what the middleware sweep below predicted. Nine scenarios passed all thirty runs and met their expectation, including every false-positive check: 90 runs with no brake command on the empty road, in the next lane or while following closely. Thirty clean runs only show that the pass rate is at least about 89 percent, so a clean streak is good evidence and not a guarantee.
 
-The hard braking lead is the exception, and the table shows 0 percent because the ego car hits the lead every time. Its goal was mitigation, an impact at or below 35 km/h, and it met that in all thirty runs. Impacts ranged from 23 to 34 km/h with a median of 29. The first brake comes at about 10 m with the ego car still at 50 km/h, because the tracker needs a moment of range data before it can tell the lead is slowing hard. It lowers the impact speed and does not avoid the crash.
+The hard braking lead is the exception, and the table shows 0 percent because the ego car hits the lead every time. Its goal was mitigation, an impact at or below 35 km/h, and it met that in 29 of 30 runs. Impacts ranged from 21 to 38 km/h with a median of 29. The one run over the limit was seed 4, which has the shortest first-brake gap in both batches: it hit at 32 km/h in the earlier batch and at 38 km/h in this one. The medians of the two batches are 28.7 and 28.8 km/h, so the system did not get worse, and a limit set on the single worst of thirty runs is simply fragile when about one run in fifty lands in the tail. The first brake comes at about 10 m with the ego car still at 50 km/h, because the tracker needs a moment of range data before it can tell the lead is slowing hard. It lowers the impact speed and does not avoid the crash.
 
-The braking lead at 2 m/s2 used to be a coin flip, and it no longer is. In the earlier ten run batch it passed 9 of 10 and stopped anywhere from 0.9 m to 12 m short. Two small things stacked up. A lead braking at 2.0 m/s2 sat exactly on my 2.0 m/s2 threshold for believing the lead was braking, and the fused range came in bursts that made the braking estimate jump. Moving the range to the nearest LiDAR return and the threshold down to 1.5 m/s2 fixed it. All thirty runs now stop clear with a gap of 8 to 12 m, and the first brake comes at 21 to 24 m in all but one. The outlier was seed 21, where the first brake came late at 16 m and the car still stopped 3.3 m short of the lead. That is the closest call in the whole batch, and it is where I would look first if the pass rate ever slips.
+The braking lead at 2 m/s2 used to be a coin flip, and it no longer is. In the earlier ten run batch it passed 9 of 10 and stopped anywhere from 0.9 m to 12 m short. Two small things stacked up. A lead braking at 2.0 m/s2 sat exactly on my 2.0 m/s2 threshold for believing the lead was braking, and the fused range came in bursts that made the braking estimate jump. Moving the range to the nearest LiDAR return and the threshold down to 1.5 m/s2 fixed it. All thirty runs now stop clear with a gap of 8 to 12 m, and the first brake comes at 21 to 26 m. One seed in the best effort batch braked late at 16 m and stopped only 3.3 m short, which was the closest call of that batch. The same seed braked at 25 m this time, which says the late brake was timing noise in the pipeline and not a property of the seed.
 
-Two next-lane runs crashed the harness before they began, because a Nissan Micra settled 0.3 to 0.4 m away from where I placed it and my start geometry check rejected it. That says nothing about the AEB. The placement now corrects itself by the measured error, and both seeds then ran and passed. CARLA also segfaulted once partway through the batch, and the runner resumed cleanly after a restart.
+In the earlier best effort batch, two next-lane runs crashed the harness before they began, because a Nissan Micra settled 0.3 to 0.4 m away from where I placed it and my start geometry check rejected it. That says nothing about the AEB. The placement now corrects itself by the measured error, and both seeds then ran and passed. CARLA also segfaulted once partway through the batch, and the runner resumed cleanly after a restart.
+
+### Does the middleware matter?
+
+The reason I moved to ROS 2 was to be able to ask this. Every node now takes a QoS reliability and queue depth as parameters, and a small probe node measures how old each fused detection is when it arrives and how many arrive at all. I swept four middleware setups (Fast DDS with its default shared memory, Fast DDS forced onto UDP, Cyclone DDS and Zenoh) against four QoS profiles (best effort or reliable, with a queue of 1 or 5 and 1 or 10), ten seeds each, in two scenarios: a stationary car at 50 km/h and the lead braking at 2 m/s2. All of it is at default middleware settings with no tuning.
+
+On an idle machine nothing separates them. All 320 runs in those two scenarios passed. The median latency from sensor stamp to fused detection was 19 to 20 ms in every configuration, the 95th percentile never passed 24 ms, and 89 to 98 percent of detections arrived. If I had stopped there, the answer would have been that it does not matter.
+
+Then I ran the same sweep while 16 busy-loop processes kept every core of the machine occupied, which is closer to what a real computer running a perception stack looks like on a bad day.
+
+![Share of detections delivered and runs without a collision under full CPU load, by middleware and QoS](docs/media/sweep_load.png)
+
+The load did the most damage by itself: only 151 of 320 runs passed, against all 320 on the idle machine, and median latency doubled to 39 ms. Within that, the middleware made a large and uneven difference.
+
+- **Fast DDS with best effort lost most of its detections.** Only 25 to 35 percent reached the controller, in both the shared memory and UDP-only setups. The stationary target at 50 km/h passed between 1 and 5 runs out of 10 in those four cells, and the braking lead passed none.
+- **Cyclone DDS and Zenoh did not.** They delivered 96 to 98 percent of detections in every QoS profile, best effort included, at a median latency of 36 to 42 ms.
+- **Reliable with a queue of 10 rescued Fast DDS.** Delivery went back to 96 or 97 percent. A reliable queue of 1 was enough with shared memory, but over UDP it still delivered only half.
+- **Delivery tracked safety.** Runs that received fewer than half of their detections passed 12 times out of 89. Runs that received at least 90 percent passed 133 times out of 220.
+
+Pooled over the four QoS profiles, the stationary 50 km/h scenario passed 34 of 40 runs on Cyclone DDS and 35 of 40 on Zenoh, against 20 of 40 on Fast DDS with shared memory and 22 of 40 over UDP. For the braking lead the counts were 14 and 12 against 7 and 7. The 95 percent intervals for the braking lead overlap, so that scenario only hints in the same direction, and the stationary scenario is the clearer one.
+
+The uncomfortable part is that my original default, best effort with a queue of 5 on Fast DDS, was among the worst cells in the grid. It was a fine choice for sensor streams on an idle machine and a poor one on a busy machine, and I would not have found out without measuring. I have since switched the default to reliable with a queue of 10, and the thirty run regression above was repeated with it. The catch is compatibility: a sensor driver that publishes best effort can no longer connect to these nodes, and has to be set to reliable too.
+
+I would not read more into these numbers than they hold. Even when 90 percent of detections arrived, only 60 percent of runs passed, so delivery is not the whole story. The simulator shares the CPU with the load, so the busy machine slows CARLA and my pacing as well as the middleware, and I did not separate those. I think large messages are the reason Fast DDS suffers, because a 1.5 MB image is split into many fragments and best effort never resends a lost one, but I have not confirmed that with packet counters. And this is ten seeds per cell on one machine with one kind of synthetic load, so a different load or a tuned middleware configuration could shift the picture.
 
 ## What is still not good
 
@@ -192,32 +215,43 @@ AEB_REGRESSION=1 AEB_REGRESSION_RUNS=3 python -m pytest src/aeb_bringup/test/tes
 
 The runner exits with an error if any scenario misses its expectation in `config/regression.yaml`, which makes it usable as a CI gate. It saves each run as a small JSON file, resumes after a crash, retries an infrastructure error once, and cleans up any nodes left over from a launch that timed out. The pytest wrapper skips itself unless `AEB_REGRESSION=1` is set and CARLA is reachable.
 
+The middleware sweep uses the same runner. Install `ros-jazzy-rmw-cyclonedds-cpp` and `ros-jazzy-rmw-zenoh-cpp` first, then:
+
+```bash
+python -m aeb_bringup.sweep --runs 10                          # idle, about 3 hours
+python -m aeb_bringup.sweep --runs 10 --load 16 --scenarios CCRs_50 CCRb_50_d2 --out sweep_runs_load16
+```
+
+It also resumes after a crash. CARLA segfaulted twice under load for me, so a restart loop around the command is worth having. A single launch accepts `qos_reliability:=reliable qos_depth:=10`, and `RMW_IMPLEMENTATION` picks the middleware as usual.
+
 The tests need no simulator.
 
 ```bash
 python -m pytest src/aeb_controller/test/test_state_machine.py src/aeb_controller/test/test_tracking.py \
   src/aeb_fusion/test/test_geometry.py src/aeb_bringup/test/test_aeb_lifecycle.py \
-  src/aeb_bringup/test/test_scenario_math.py src/aeb_bringup/test/test_regression_stats.py
+  src/aeb_bringup/test/test_scenario_math.py src/aeb_bringup/test/test_regression_stats.py \
+  src/aeb_common/test/test_qos.py
 ```
 
-That is 63 tests. They cover the controller logic, the tracker, the fusion geometry, the regression statistics and the controller's lifecycle transitions through `launch_testing`. The auto-generated flake8 and pep257 stubs that `ros2 pkg create` adds enforce ROS style and are not part of this list.
+That is 68 tests. They cover the controller logic, the tracker, the fusion geometry, the regression statistics and the controller's lifecycle transitions through `launch_testing`. The auto-generated flake8 and pep257 stubs that `ros2 pkg create` adds enforce ROS style and are not part of this list.
 
 ## What is in the repository
 
 ```
+src/aeb_common/       the QoS profile every node shares
 src/aeb_detector/     YOLO node
 src/aeb_fusion/       fusion node and geometry.py (nearest cluster depth)
 src/aeb_controller/   lifecycle node, tracking.py, state_machine.py
-src/aeb_bringup/      launch file, scenarios.yaml, params, CARLA bridge, regression runner and statistics, tests
+src/aeb_bringup/      launch file, scenarios.yaml, params, CARLA bridge, regression and sweep runners, statistics, latency probe, tests
 scripts/              run_scenarios.sh, analyze_bags.py, controller_sim.py, make_charts.py, make_pov_gif.py
 benchmarks/           detector benchmark, offline fusion test, and their CSV results
-docs/                 regression report and data, plus media/ with the charts and clips used here
+docs/                 regression and sweep reports and data, plus media/ with the charts and clips used here
 ```
 
 `controller_sim.py` is the offline controller simulation I used to screen thresholds. It uses the measured brake map and the measured estimate noise. Run it with `validate` to compare it against the last recorded CARLA results.
 
 ## What comes next
 
-The regression test exists and now runs thirty seeds per scenario, so the next jobs are the ones it pointed at. First is a faster reaction to a hard braking lead car, since that is the one scenario that still collides. After that I want to widen what is tested, with pedestrians, curves, cut-ins and weather, and a sweep over QoS settings and DDS implementations to see whether the middleware configuration changes the safety outcome. That last one is the part I think is most worth writing up properly.
+The regression test runs thirty seeds per scenario and the middleware sweep has shown where the QoS settings matter, so the next jobs follow from those. First is a faster reaction to a hard braking lead car, since that is the one scenario that still collides. After that I want to widen what is tested, with pedestrians, curves, cut-ins and weather. The sweep also leaves questions open: finding out why Fast DDS best effort drops so much, trying tuned Cyclone and Fast DDS settings, and testing other kinds of stress such as a lossy network.
 
 Licensed under Apache 2.0.

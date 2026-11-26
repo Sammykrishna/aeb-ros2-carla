@@ -6,7 +6,7 @@ import launch_ros.actions
 import launch_testing.actions
 import pytest
 import rclpy
-from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from aeb_common.qos import stream_qos
 from lifecycle_msgs.srv import ChangeState
 from lifecycle_msgs.msg import Transition
 from nav_msgs.msg import Odometry
@@ -40,15 +40,15 @@ class TestAeb(unittest.TestCase):
         self.assertTrue(fut.result().success)
 
     def test_full_brake_on_closing_target(self):
-        be = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=1)
+        stream = stream_qos("reliable", 10)
         self._transition(Transition.TRANSITION_CONFIGURE)
         self._transition(Transition.TRANSITION_ACTIVATE)
 
         brakes, states = [], []
         self.node.create_subscription(Float32, "/aeb/brake_cmd", lambda m: brakes.append(m.data), 10)
         self.node.create_subscription(String, "/aeb/state", lambda m: states.append(m.data), 10)
-        pub_o = self.node.create_publisher(Detection3DArray, "/aeb/objects_3d", be)
-        pub_e = self.node.create_publisher(Odometry, "/ego/odom", be)
+        pub_o = self.node.create_publisher(Detection3DArray, "/aeb/objects_3d", stream)
+        pub_e = self.node.create_publisher(Odometry, "/ego/odom", stream)
 
         rng, speed, dt = 40.0, 13.9, 0.05          # 50 km/h at 40 m from a stationary target
         end = time.time() + 6.0

@@ -8,9 +8,9 @@ import numpy as np
 import rclpy
 import yaml
 from ament_index_python.packages import get_package_share_directory
+from aeb_common.qos import declare_stream_qos
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import Float32, String
 from vision_msgs.msg import Detection3DArray
@@ -177,21 +177,28 @@ class ScenarioNode(Node):
         self.a_req_mps2 = 0.0
         self.perceived_range_m: float | None = None
         self.perceived_at_s = 0.0
-        self.pub_img = self.create_publisher(Image, "/ego/camera/image", qos_profile_sensor_data)
-        self.pub_info = self.create_publisher(CameraInfo, "/ego/camera/camera_info", qos_profile_sensor_data)
-        self.pub_pcl = self.create_publisher(PointCloud2, "/ego/lidar/points", qos_profile_sensor_data)
-        self.pub_odom = self.create_publisher(Odometry, "/ego/odom", qos_profile_sensor_data)
+        self.probe_stats: dict = {}
+        self.frames_sent = 0
+        qos = declare_stream_qos(self)
+        self.pub_img = self.create_publisher(Image, "/ego/camera/image", qos)
+        self.pub_info = self.create_publisher(CameraInfo, "/ego/camera/camera_info", qos)
+        self.pub_pcl = self.create_publisher(PointCloud2, "/ego/lidar/points", qos)
+        self.pub_odom = self.create_publisher(Odometry, "/ego/odom", qos)
         self.pub_gap = self.create_publisher(Float32, "/ground_truth/gap", 10)
         self.pub_lat = self.create_publisher(Float32, "/ground_truth/lateral_offset", 10)
         self.pub_col = self.create_publisher(Float32, "/ground_truth/collision", 10)
         self.pub_res = self.create_publisher(String, "/scenario/result", 10)
         self.create_subscription(Float32, "/aeb/brake_cmd", self._on_brake, 1)
+        self.create_subscription(String, "/probe/latency", self._on_probe, 1)
         self.create_subscription(String, "/aeb/state", self._on_state, 1)
         self.create_subscription(Float32, "/aeb/required_decel", self._on_decel, 1)
-        self.create_subscription(Detection3DArray, "/aeb/objects_3d", self._on_objects, qos_profile_sensor_data)
+        self.create_subscription(Detection3DArray, "/aeb/objects_3d", self._on_objects, qos)
 
     def _on_brake(self, msg: Float32):
         self.brake = msg.data
+
+    def _on_probe(self, msg: String):
+        self.probe_stats = json.loads(msg.data)
 
     def _on_state(self, msg: String):
         self.aeb_state = msg.data
@@ -239,6 +246,7 @@ class ScenarioNode(Node):
         odom.header.stamp, odom.header.frame_id = stamp, "odom"
         odom.twist.twist.linear.x = float(ego.get_velocity().length())
 
+        self.frames_sent += 1
         self.pub_img.publish(img_msg)
         self.pub_info.publish(info)
         self.pub_pcl.publish(cloud)
@@ -345,10 +353,12 @@ def run(node: ScenarioNode):
         node.get_logger().info(f"{node.name}: {result} (t={t_s:.1f}s, min gap {min_gap_m:.2f} m, drift {max_drift_m:.2f} m)")
         node.pub_res.publish(String(data=f"{node.name}:{result}:min_gap={min_gap_m:.2f}"))
         summary_path = node.get_parameter("summary_path").value
+        for _ in range(10):  # one callback per spin, so drain the queue to pick up the probe's last message
+            rclpy.spin_once(node, timeout_sec=0.0)
         if summary_path:
             with open(summary_path, "w") as f:
                 json.dump(dict(scenario=node.name, seed=node.get_parameter("seed").value, result=result, min_gap_m=min_gap_m,
-                               max_brake=max_brake, max_drift_m=max_drift_m, duration_s=t_s, impact_kmh=impact_kmh if collided else 0.0,
+                               max_brake=max_brake, max_drift_m=max_drift_m, frames_sent=node.frames_sent, **node.probe_stats, duration_s=t_s, impact_kmh=impact_kmh if collided else 0.0,
                                first_brake_gap_m=first_brake[0] if first_brake else None,
                                first_brake_kmh=first_brake[1] if first_brake else None,
                                **{k: cfg[k] for k in ("ego_kmh", "target_kmh", "gap_m", "lateral_offset_m", "target_model", "brake_after_s", "false_positive") if k in cfg}), f)

@@ -1,0 +1,34 @@
+| Config | Scenario | Runs | Pass | 95% interval | Min gap, mean | First brake, mean | Latency p50 / p95 / worst | Delivered |
+|---|---|---|---|---|---|---|---|---|
+| fastrtps_be1_load16 | CCRb_50_d2 | 10 | 0 | 0% to 28% | -0.1 m | 8.3 m | 37 / 55 / 173 ms | 28% |
+| fastrtps_be1_load16 | CCRs_50 | 10 | 1 | 2% to 40% | 0.0 m | 12.8 m | 36 / 66 / 176 ms | 27% |
+| fastrtps_be5_load16 | CCRb_50_d2 | 10 | 0 | 0% to 28% | -0.0 m | 9.2 m | 38 / 54 / 173 ms | 25% |
+| fastrtps_be5_load16 | CCRs_50 | 10 | 1 | 2% to 40% | 0.0 m | 18.1 m | 38 / 70 / 151 ms | 26% |
+| fastrtps_rel1_load16 | CCRb_50_d2 | 10 | 2 | 6% to 51% | 1.2 m | 13.2 m | 63 / 79 / 193 ms | 97% |
+| fastrtps_rel1_load16 | CCRs_50 | 10 | 9 | 60% to 98% | 4.5 m | 24.3 m | 62 / 78 / 188 ms | 95% |
+| fastrtps_rel10_load16 | CCRb_50_d2 | 10 | 5 | 24% to 76% | 3.1 m | 14.7 m | 65 / 81 / 212 ms | 98% |
+| fastrtps_rel10_load16 | CCRs_50 | 10 | 9 | 60% to 98% | 5.7 m | 25.4 m | 66 / 79 / 198 ms | 97% |
+| fastrtps_udp_be1_load16 | CCRb_50_d2 | 10 | 0 | 0% to 28% | -0.0 m | 7.7 m | 37 / 45 / 154 ms | 33% |
+| fastrtps_udp_be1_load16 | CCRs_50 | 10 | 2 | 6% to 51% | 1.0 m | 16.1 m | 36 / 54 / 156 ms | 35% |
+| fastrtps_udp_be5_load16 | CCRb_50_d2 | 10 | 0 | 0% to 28% | -0.0 m | 10.6 m | 36 / 49 / 176 ms | 35% |
+| fastrtps_udp_be5_load16 | CCRs_50 | 10 | 5 | 24% to 76% | 1.9 m | 20.6 m | 36 / 50 / 163 ms | 36% |
+| fastrtps_udp_rel1_load16 | CCRb_50_d2 | 10 | 3 | 11% to 60% | 0.8 m | 10.7 m | 67 / 106 / 178 ms | 52% |
+| fastrtps_udp_rel1_load16 | CCRs_50 | 10 | 6 | 31% to 83% | 2.8 m | 20.3 m | 59 / 107 / 207 ms | 50% |
+| fastrtps_udp_rel10_load16 | CCRb_50_d2 | 10 | 4 | 17% to 69% | 3.3 m | 15.2 m | 102 / 141 / 226 ms | 97% |
+| fastrtps_udp_rel10_load16 | CCRs_50 | 10 | 9 | 60% to 98% | 5.5 m | 24.9 m | 103 / 153 / 253 ms | 96% |
+| cyclonedds_be1_load16 | CCRb_50_d2 | 10 | 3 | 11% to 60% | 1.5 m | 13.7 m | 37 / 47 / 179 ms | 98% |
+| cyclonedds_be1_load16 | CCRs_50 | 10 | 7 | 40% to 89% | 3.7 m | 22.2 m | 37 / 46 / 172 ms | 96% |
+| cyclonedds_be5_load16 | CCRb_50_d2 | 10 | 5 | 24% to 76% | 2.5 m | 15.1 m | 37 / 47 / 173 ms | 97% |
+| cyclonedds_be5_load16 | CCRs_50 | 10 | 9 | 60% to 98% | 4.4 m | 23.5 m | 37 / 47 / 176 ms | 97% |
+| cyclonedds_rel1_load16 | CCRb_50_d2 | 10 | 3 | 11% to 60% | 1.9 m | 13.2 m | 37 / 45 / 156 ms | 97% |
+| cyclonedds_rel1_load16 | CCRs_50 | 10 | 8 | 49% to 94% | 3.6 m | 22.3 m | 37 / 46 / 168 ms | 97% |
+| cyclonedds_rel10_load16 | CCRb_50_d2 | 10 | 3 | 11% to 60% | 1.5 m | 13.0 m | 36 / 46 / 176 ms | 97% |
+| cyclonedds_rel10_load16 | CCRs_50 | 10 | 10 | 72% to 100% | 5.4 m | 25.2 m | 36 / 47 / 170 ms | 97% |
+| zenoh_be1_load16 | CCRb_50_d2 | 10 | 2 | 6% to 51% | 1.5 m | 12.2 m | 41 / 56 / 174 ms | 98% |
+| zenoh_be1_load16 | CCRs_50 | 10 | 9 | 60% to 98% | 4.9 m | 24.4 m | 42 / 57 / 175 ms | 96% |
+| zenoh_be5_load16 | CCRb_50_d2 | 10 | 1 | 2% to 40% | 0.2 m | 12.1 m | 41 / 56 / 209 ms | 98% |
+| zenoh_be5_load16 | CCRs_50 | 10 | 10 | 72% to 100% | 5.9 m | 25.9 m | 41 / 56 / 167 ms | 97% |
+| zenoh_rel1_load16 | CCRb_50_d2 | 10 | 7 | 40% to 89% | 3.3 m | 16.0 m | 41 / 56 / 177 ms | 98% |
+| zenoh_rel1_load16 | CCRs_50 | 10 | 8 | 49% to 94% | 4.0 m | 24.0 m | 40 / 55 / 163 ms | 97% |
+| zenoh_rel10_load16 | CCRb_50_d2 | 10 | 2 | 6% to 51% | 1.0 m | 12.5 m | 41 / 56 / 179 ms | 97% |
+| zenoh_rel10_load16 | CCRs_50 | 10 | 8 | 49% to 94% | 4.7 m | 24.1 m | 41 / 57 / 174 ms | 97% |
